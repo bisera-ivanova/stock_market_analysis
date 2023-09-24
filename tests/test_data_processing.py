@@ -93,7 +93,7 @@ class TestDataProcessing(unittest.TestCase):
         self.assertEqual(result, expected_dict)
 
     def test_ingest_into_sql(self):
-        conn = sqlite3.connect("stock_data.db")
+        conn = sqlite3.connect("./stock_data.db")
         cursor = conn.cursor()
 
         cursor.execute("SELECT 1")

@@ -12,11 +12,7 @@ STOCKS_LIST = ["TSLA", "AMZN", "INTC", "AAPL", "AVGR", "AMD", "F", "GOOGL", "PLT
                "RIVN", "PINS", "T", "PFE", "LCID", "META", "MSFT", "BABA", "CSCO"]
 STOCK_API_KEY = os.environ.get('STOCK_API_KEY')
 
-# used to track the number of requests being made so that the delay can be optimized
-FUNCTION_CALL_COUNTER = 0
-
-# Used to normalize the UNIX timestamp, which is in a Msec format so that it is readable by the time.fromtimestamp()
-# function
+# Used to normalize the UNIX timestamp
 NORMALIZING_NUMBER = 1000
 
 
@@ -25,7 +21,7 @@ class DataProcessor:
     The DataProcessor class is designed to fetch stock market data from the Polygon API, process the retrieved data,
     normalize the UNIX timestamps, and store the data in an SQLite database for further analysis.
     """
-
+    _function_call_counter = 0
 
     def build_request_links(self):
         """
@@ -43,23 +39,22 @@ class DataProcessor:
 
     def make_requests_for_stock_data(self, stock_link):
         """
-            Makes HTTP GET requests to the Polygon API for stock market data, processes the data, normalizes the
-            timestamps, and ingests it into an SQLite database.
+            Makes HTTP GET requests to the Polygon API for stock market data.
 
         Args:
             stock_link (str): The API request URL for a specific stock.
 
         """
-        global FUNCTION_CALL_COUNTER
+
         response = requests.get(stock_link)
         print(response.json())
         if response.json()["resultsCount"]:
             data = self.process_returned_values(response.json())
             self.ingest_values_into_sql(data)
-        FUNCTION_CALL_COUNTER += 1
-        if FUNCTION_CALL_COUNTER >= 4:
+        self._function_call_counter += 1
+        if self._function_call_counter >= 4:
             time.sleep(60)
-            FUNCTION_CALL_COUNTER = 0
+            self._function_call_counter = 0
         if "next_url" in response.json():
             self.make_next_url(response.json())
 
@@ -86,8 +81,9 @@ class DataProcessor:
         Returns:
             dict: A dictionary containing processed stock market data.
         """
-        data = {"timestamp": [datetime.datetime.fromtimestamp(result["t"] / NORMALIZING_NUMBER).strftime('%Y-%m-%d %H:%M:%S.%f')
-                              for result in response["results"]],
+        data = {"timestamp": [
+            datetime.datetime.fromtimestamp(result["t"] / NORMALIZING_NUMBER).strftime('%Y-%m-%d %H:%M:%S.%f')
+            for result in response["results"]],
                 "stock_name": [response["ticker"]] * response["resultsCount"],
                 "highest": [result["h"] for result in response["results"]],
                 "lowest": [result["l"] for result in response["results"]],
