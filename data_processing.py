@@ -8,8 +8,6 @@ from dotenv import load_dotenv
 
 load_dotenv("credentials.env")
 
-#TODO Documentation
-
 STOCKS_LIST = ["TSLA", "AMZN", "INTC", "AAPL", "AVGR", "AMD", "F", "GOOGL", "PLTR", "NVDA", "BAC",
                "RIVN", "PINS", "T", "PFE", "LCID", "META", "MSFT", "BABA", "CSCO"]
 STOCK_API_KEY = os.environ.get('STOCK_API_KEY')
@@ -23,8 +21,19 @@ NORMALIZING_NUMBER = 1000
 
 
 class DataProcessor:
+    """
+    The DataProcessor class is designed to fetch stock market data from the Polygon API, process the retrieved data,
+    normalize the UNIX timestamps, and store the data in an SQLite database for further analysis.
+    """
+
 
     def build_request_links(self):
+        """
+        Generates a list of API request URLs for the specified stocks within a given date range.
+
+        Returns:
+            list of str: A list of API request URLs.
+        """
         result = []
         for stock in STOCKS_LIST:
             stock_request_URL = f"https://api.polygon.io/v2/aggs/ticker/{stock}/range/1/week/2022-01-09/2023-01-09?" \
@@ -33,6 +42,14 @@ class DataProcessor:
         return result
 
     def make_requests_for_stock_data(self, stock_link):
+        """
+            Makes HTTP GET requests to the Polygon API for stock market data, processes the data, normalizes the
+            timestamps, and ingests it into an SQLite database.
+
+        Args:
+            stock_link (str): The API request URL for a specific stock.
+
+        """
         global FUNCTION_CALL_COUNTER
         response = requests.get(stock_link)
         print(response.json())
@@ -47,11 +64,28 @@ class DataProcessor:
             self.make_next_url(response.json())
 
     def make_next_url(self, response):
+        """
+        Builds the next URL for fetching additional data pages from the Polygon API and calls
+        make_requests_for_stock_data to continue fetching data.
+
+        Args:
+            response (dict): The JSON response from the Polygon API.
+
+        """
         next_url = response["next_url"]
         final_url = f"{next_url}&apiKey={STOCK_API_KEY}"
         self.make_requests_for_stock_data(final_url)
 
     def process_returned_values(self, response):
+        """
+        Processes the JSON response from the API, extracts relevant data, and normalizes the timestamps.
+
+        Args:
+            response (dict): The JSON response from the Polygon API.
+
+        Returns:
+            dict: A dictionary containing processed stock market data.
+        """
         data = {"timestamp": [datetime.datetime.fromtimestamp(result["t"] / NORMALIZING_NUMBER).strftime('%Y-%m-%d %H:%M:%S.%f')
                               for result in response["results"]],
                 "stock_name": [response["ticker"]] * response["resultsCount"],
@@ -65,6 +99,13 @@ class DataProcessor:
         return data
 
     def ingest_values_into_sql(self, data):
+        """
+            Inserts the processed stock market data into an SQLite database.
+
+            Args:
+                 data (dict): A dictionary containing processed stock market data.
+
+        """
         conn = sqlite3.connect('stock_data.db')
         cursor = conn.cursor()
         cursor.execute('''
