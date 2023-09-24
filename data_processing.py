@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 load_dotenv("credentials.env")
 
 #TODO Documentation
-#TODO Unit tests
 
 STOCKS_LIST = ["TSLA", "AMZN", "INTC", "AAPL", "AVGR", "AMD", "F", "GOOGL", "PLTR", "NVDA", "BAC",
                "RIVN", "PINS", "T", "PFE", "LCID", "META", "MSFT", "BABA", "CSCO"]
@@ -17,6 +16,10 @@ STOCK_API_KEY = os.environ.get('STOCK_API_KEY')
 
 # used to track the number of requests being made so that the delay can be optimized
 FUNCTION_CALL_COUNTER = 0
+
+# Used to normalize the UNIX timestamp, which is in a Msec format so that it is readable by the time.fromtimestamp()
+# function
+NORMALIZING_NUMBER = 1000
 
 
 class DataProcessor:
@@ -41,17 +44,15 @@ class DataProcessor:
             time.sleep(60)
             FUNCTION_CALL_COUNTER = 0
         if "next_url" in response.json():
-            self.make_next_url_request(response.json())
+            self.make_next_url(response.json())
 
-    def make_next_url_request(self, response):
+    def make_next_url(self, response):
         next_url = response["next_url"]
         final_url = f"{next_url}&apiKey={STOCK_API_KEY}"
         self.make_requests_for_stock_data(final_url)
 
     def process_returned_values(self, response):
-        # The result["t"] is divided by 1000 as it comes as UNIX Msec timestamp, which is unreadable for the
-        # fromtimestamp(0) function
-        data = {"timestamp": [datetime.datetime.fromtimestamp(result["t"] / 1000).strftime('%Y-%m-%d %H:%M:%S.%f')
+        data = {"timestamp": [datetime.datetime.fromtimestamp(result["t"] / NORMALIZING_NUMBER).strftime('%Y-%m-%d %H:%M:%S.%f')
                               for result in response["results"]],
                 "stock_name": [response["ticker"]] * response["resultsCount"],
                 "highest": [result["h"] for result in response["results"]],
